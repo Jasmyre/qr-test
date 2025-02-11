@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Attendance App</title>
+  <!-- Simple styling -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      background-color: #f0f0f0;
+      text-align: center;
+    }
+    header {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px;
+    }
+    .container {
+      margin: 20px auto;
+      max-width: 500px;
+      background-color: white;
+      padding: 20px;
+      box-shadow: 0px 0px 5px rgba(0,0,0,0.2);
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    input[type="text"], input[type="date"] {
+      padding: 8px;
+      width: 80%;
+      margin: 10px 0;
+      font-size: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      font-size: 14px;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .hidden {
+      display: none;
+    }
+    #qrcode {
+      margin: 20px auto;
+      width: 128px;
+      height: 128px;
+    }
+  </style>
+  <!-- QRCode library via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Attendance App</h1>
+  </header>
+
+  <!-- Home page: choose role -->
+  <div id="home" class="container">
+    <h2>Who are you?</h2>
+    <button onclick="goToStudent()">I'm a Student</button>
+    <button onclick="goToTeacher()">I'm a Teacher</button>
+  </div>
+
+  <!-- Student page: enter name -->
+  <div id="student" class="container hidden">
+    <h2>Student Check-In</h2>
+    <p>Please enter your name:</p>
+    <input type="text" id="studentName" placeholder="Your name">
+    <br>
+    <button onclick="submitAttendance()">Attend</button>
+    <br>
+    <button onclick="goHome()">Back Home</button>
+  </div>
+
+  <!-- Teacher page: view attendance and qr code -->
+  <div id="teacher" class="container hidden">
+    <h2>Teacher's Attendance Dashboard</h2>
+    <button onclick="generateSession()">Generate New Session</button>
+    <button onclick="goHome()">Logout</button>
+    <div id="sessionInfo" style="margin-top:10px;"></div>
+    <div id="qrcode"></div>
+    <hr>
+    <h3>Attendance Records</h3>
+    <label for="filterDate">Filter by Date:</label>
+    <input type="date" id="filterDate">
+    <button onclick="filterRecords()">Filter</button>
+    <table id="attendanceTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Session</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Attendance rows will be added here -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Script Section -->
+  <script>
+    // Simple function to show a view and hide others
+    function showView(viewId) {
+      document.getElementById('home').classList.add('hidden');
+      document.getElementById('student').classList.add('hidden');
+      document.getElementById('teacher').classList.add('hidden');
+      document.getElementById(viewId).classList.remove('hidden');
+    }
+
+    // Helper to get query parameter from URL
+    function getQueryParam(param) {
+      let params = new URLSearchParams(window.location.search);
+      return params.get(param);
+    }
+
+    // Generate a simple UUID
+    function generateUUID() {
+      return 'xxxx-xxxx-xxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0;
+        return r.toString(16);
+      });
+    }
+
+    // Attendance record helpers
+    function getAttendanceRecords() {
+      let records = localStorage.getItem('attendanceRecords');
+      return records ? JSON.parse(records) : [];
+    }
+
+    function saveAttendanceRecords(records) {
+      localStorage.setItem('attendanceRecords', JSON.stringify(records));
+    }
+
+    function addAttendanceRecord(record) {
+      let records = getAttendanceRecords();
+      records.push(record);
+      saveAttendanceRecords(records);
+    }
+
+    // Navigation functions
+    function goToStudent() {
+      // if the url has a session id, use it, otherwise leave blank (it might be a manual selection)
+      showView('student');
+    }
+
+    function goToTeacher() {
+      showView('teacher');
+      updateAttendanceTable();
+    }
+
+    function goHome() {
+      // clear query string if any
+      window.history.pushState({}, document.title, window.location.pathname);
+      showView('home');
+    }
+
+    // When student clicks "Attend"
+    function submitAttendance() {
+      let name = document.getElementById('studentName').value.trim();
+      if (!name) {
+        alert("Please enter your name!");
+        return;
+      }
+      // Get current date and time
+      let now = new Date();
+      let date = now.toLocaleDateString();
+      let time = now.toLocaleTimeString();
+      // Get session id from query param if exists
+      let session = getQueryParam('session') || 'default';
+      let record = { id: generateUUID(), name: name, date: date, time: time, session: session };
+      addAttendanceRecord(record);
+      alert("Attendance recorded! Thank you " + name);
+      // Clear input field
+      document.getElementById('studentName').value = "";
+    }
+
+    // Update the attendance table in teacher view
+    function updateAttendanceTable(filterDate) {
+      let tbody = document.getElementById('attendanceTable').getElementsByTagName('tbody')[0];
+      tbody.innerHTML = ""; // clear current rows
+      let records = getAttendanceRecords();
+      // If filterDate is provided, filter records
+      if (filterDate) {
+        records = records.filter(rec => rec.date === filterDate);
+      }
+      records.forEach(function(rec) {
+        let row = tbody.insertRow();
+        row.insertCell(0).innerText = rec.name;
+        row.insertCell(1).innerText = rec.date;
+        row.insertCell(2).innerText = rec.time;
+        row.insertCell(3).innerText = rec.session;
+      });
+    }
+
+    // Filter records by chosen date
+    function filterRecords() {
+      let filterDate = document.getElementById('filterDate').value;
+      updateAttendanceTable(filterDate);
+    }
+
+    // Generate a new session and corresponding QR code
+    function generateSession() {
+      let sessionId = generateUUID();
+      // Update session info display
+      document.getElementById('sessionInfo').innerText = "Current Session ID: " + sessionId;
+      // Create a url with the session id as query param so when students scan, they get the session id
+      let url = window.location.origin + window.location.pathname + "?session=" + sessionId;
+      // Generate QR code in the #qrcode div
+      document.getElementById('qrcode').innerHTML = "";
+      new QRCode(document.getElementById("qrcode"), {
+        text: url,
+        width: 128,
+        height: 128
+      });
+      // Optionally, teacher can store current session if needed later.
+      console.log("New session generated: " + sessionId);
+    }
+
+    // When page loads, check if there's a session id in query param. If yes, then show student view.
+    window.onload = function() {
+      let session = getQueryParam('session');
+      if (session) {
+        // if user came from scanning qr, then show student check in automatically
+        showView('student');
+      } else {
+        showView('home');
+      }
+    }
+  </script>
+</body>
+</html>
